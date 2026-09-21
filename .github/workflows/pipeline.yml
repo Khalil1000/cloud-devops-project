@@ -1,0 +1,106 @@
+name: Portfolio pipeline
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: portfolio-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify-and-release:
+    name: Test, scan and deploy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      APP_VERSION: ${{ github.sha }}
+      LOCAL_IMAGE: portfolio:${{ github.sha }}
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      AWS_DEFAULT_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      AWS_PAGER: ""
+
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: "1.14.6"
+          terraform_wrapper: false
+
+      - name: Test application and release checks
+        run: |
+          python -m pip install -r app/requirements.txt
+          python -m unittest discover -s tests -v
+
+      - name: Validate infrastructure without AWS credentials
+        run: |
+          terraform fmt -check -recursive infra
+          terraform -chdir=infra/bootstrap init -backend=false -input=false
+          terraform -chdir=infra/bootstrap validate
+          terraform -chdir=infra/environment init -backend=false -input=false
+          terraform -chdir=infra/environment validate
+
+      - name: Build the release image
+        run: |
+          docker buildx build --platform linux/amd64 --provenance=false --sbom=false --load \
+            --build-arg APP_VERSION="$APP_VERSION" -t "$LOCAL_IMAGE" .
+
+      - name: Scan the exact image that will be deployed
+        run: bash scripts/scan_image.sh "$LOCAL_IMAGE"
+
+      - name: Install local Kubernetes tools
+        run: |
+          bash scripts/install_kind_tools.sh
+          echo "$PWD/tools/bin" >> "$GITHUB_PATH"
+
+      - name: Verify deployment on an ephemeral Kubernetes cluster
+        run: |
+          kind create cluster --name portfolio --config k8s/kind.yaml --wait 120s
+          bash scripts/deploy_local.sh "$LOCAL_IMAGE" "$APP_VERSION"
+
+      # PR token subjects cannot assume this role: IAM trusts only this repo's main branch.
+      - name: Obtain short-lived AWS credentials
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.AWS_DEPLOY_ENABLED == 'true'
+        uses: aws-actions/configure-aws-credentials@cabfdba3510de1431bac9dba27511d97497fc100 # v5
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: portfolio-${{ github.run_id }}
+
+      - name: Publish the verified image and promote AWS release
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.AWS_DEPLOY_ENABLED == 'true'
+        env:
+          ECR_REPOSITORY_URL: ${{ vars.ECR_REPOSITORY_URL }}
+          LAMBDA_FUNCTION_NAME: ${{ vars.LAMBDA_FUNCTION_NAME }}
+        run: |
+          : "${ECR_REPOSITORY_URL:?Set the repository variable}"
+          : "${LAMBDA_FUNCTION_NAME:?Set the function variable}"
+          registry="${ECR_REPOSITORY_URL%%/*}"
+          release_image="$ECR_REPOSITORY_URL:$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          aws ecr get-login-password | docker login --username AWS --password-stdin "$registry"
+          docker tag "$LOCAL_IMAGE" "$release_image"
+          docker push "$release_image"
+          bash scripts/deploy_lambda.sh "$LAMBDA_FUNCTION_NAME" "$release_image" "$APP_VERSION"
+
+      - name: Remove the temporary cluster
+        if: always()
+        run: |
+          if command -v kind >/dev/null 2>&1; then
+            kind delete cluster --name portfolio
+          fi

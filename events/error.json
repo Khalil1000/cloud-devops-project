@@ -1,0 +1,29 @@
+{
+  "version": "2.0",
+  "routeKey": "$default",
+  "rawPath": "/demo/error",
+  "rawQueryString": "",
+  "headers": {
+    "host": "portfolio.local"
+  },
+  "requestContext": {
+    "accountId": "demo",
+    "apiId": "demo",
+    "domainName": "portfolio.local",
+    "domainPrefix": "portfolio",
+    "requestId": "portfolio-demo",
+    "routeKey": "$default",
+    "stage": "$default",
+    "time": "01/Jan/2026:00:00:00 +0000",
+    "timeEpoch": 1767225600000,
+    "http": {
+      "method": "POST",
+      "path": "/demo/error",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "127.0.0.1",
+      "userAgent": "portfolio-demo"
+    }
+  },
+  "body": "",
+  "isBase64Encoded": false
+}

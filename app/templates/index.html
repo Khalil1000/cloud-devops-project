@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cloud DevOps Portfolio</title>
+  <style>
+    body { margin:0; padding:48px 24px; background:#f3f6fa; color:#16263b;
+           font-family:system-ui,sans-serif; line-height:1.6; }
+    main { max-width:760px; margin:8vh auto; background:white; padding:40px;
+           border:1px solid #dce4ee; border-radius:16px; }
+    .eyebrow { color:#35639a; font-size:13px; letter-spacing:2px; font-weight:700; }
+    h1 { font-size:clamp(28px,5vw,42px); line-height:1.15; }
+    .status { color:#126844; background:#e8f6ed; display:inline-block;
+              padding:4px 12px; border-radius:20px; }
+    code { overflow-wrap:anywhere; }
+    a { color:#145fc2; }
+    .meta { border-top:1px solid #e0e6ee; margin-top:28px; padding-top:20px; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">CLOUD DEVOPS PORTFOLIO</div>
+    <h1>{{ message }}</h1>
+    <p class="status">Application responding</p>
+    <p>A small application for practicing automated delivery, monitoring,
+       and recovery on AWS.</p>
+    <div class="meta">
+      <strong>Deployed version</strong><br><code>{{ version }}</code>
+      <p><a href="/version">Version JSON</a> &nbsp;·&nbsp;
+         <a href="/healthz">Liveness</a> &nbsp;·&nbsp;
+         <a href="/readyz">Readiness</a></p>
+    </div>
+  </main>
+</body>
+</html>

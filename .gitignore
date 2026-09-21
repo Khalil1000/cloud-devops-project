@@ -1,0 +1,24 @@
+.venv/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+!.env.example
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+!*.tfvars.example
+backend.hcl
+crash.log
+*.pem
+*.key
+.DS_Store
+image.tar
+trivy.json
+rendered/
+evidence/private/
+port-forward.log
+tools/bin/
+# Commit .terraform.lock.hcl: it records provider selections and checksums.

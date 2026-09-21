@@ -1,0 +1,7 @@
+aws_region          = "us-east-1"
+project_name        = "devops-portfolio"
+bootstrap_image_tag = "bootstrap"
+github_repository   = "YOUR-GITHUB-USERNAME/cloud-devops-project"
+enable_email_alerts  = false
+alert_email         = "you@example.com"
+existing_github_oidc_provider_arn = ""
