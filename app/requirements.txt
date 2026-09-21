@@ -7,3 +7,7 @@ itsdangerous==2.2.0
 Jinja2==3.1.6
 MarkupSafe==3.0.3
 Werkzeug==3.1.8
+jaraco.context==6.1.0
+msgpack==1.2.1
+setuptools==78.1.1
+wheel==0.46.2
