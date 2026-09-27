@@ -22,10 +22,12 @@ resource "aws_iam_role" "github" {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
         }
         StringLike = {
-          "token.actions.githubusercontent.com:sub" = "repo:${var.github_repository}*:*"
+          "token.actions.githubusercontent.com:sub" = [
+            "repo:Khalil1000/cloud-devops-project:*",
+            "repo:Khalil1000*/cloud-devops-project*:*"
+          ]
         }
       }
-
     }]
   })
 }
