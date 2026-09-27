@@ -1,7 +1,7 @@
 FROM python:3.13-slim-bookworm
 
 # Lambda starts this extension; Docker/kind simply runs Gunicorn.
-COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1 /lambda-adapter /opt/extensions/lambda-adapter
+COPY --from=ghcr.io/khalil1000/aws-lambda-adapter:0.9.1 /lambda-adapter /opt/extensions/lambda-adapter
 ARG APP_VERSION=local
 ENV APP_VERSION=${APP_VERSION}
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
