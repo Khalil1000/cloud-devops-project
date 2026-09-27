@@ -59,10 +59,8 @@ jobs:
 
       - name: Build the release image
         run: |
-          aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
           docker buildx build --platform linux/amd64 --provenance=false --sbom=false --load \
             --build-arg APP_VERSION="$APP_VERSION" -t "$LOCAL_IMAGE" .
-
 
       - name: Scan the exact image that will be deployed
         run: echo "Temporarily skipping scanner check to unblock delivery"
@@ -96,11 +94,11 @@ jobs:
           : "${LAMBDA_FUNCTION_NAME:?Set the function variable}"
           registry="${ECR_REPOSITORY_URL%%/*}"
           release_image="$ECR_REPOSITORY_URL:$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-          
+
           # Log into both private and public registries here where credentials exist
           aws ecr get-login-password | docker login --username AWS --password-stdin "$registry"
           aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
-          
+
           docker tag "$LOCAL_IMAGE" "$release_image"
           docker push "$release_image"
           bash scripts/deploy_lambda.sh "$LAMBDA_FUNCTION_NAME" "$release_image" "$APP_VERSION"
