@@ -71,3 +71,4 @@ delivery and troubleshooting lessons while controlling cost.
 
 Before making claims about your results, run the guide and replace the
 placeholders in your evidence and incident notes with your actual observations.
+# Continuous Deployment verification link trace
