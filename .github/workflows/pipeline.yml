@@ -93,11 +93,10 @@ jobs:
           : "${ECR_REPOSITORY_URL:?Set the repository variable}"
           : "${LAMBDA_FUNCTION_NAME:?Set the function variable}"
           registry="${ECR_REPOSITORY_URL%%/*}"
+          : "${registry:?ECR_REPOSITORY_URL must start with a registry host, e.g. 123456789012.dkr.ecr.us-east-1.amazonaws.com/portfolio (no leading slash, no https://)}"
           release_image="$ECR_REPOSITORY_URL:$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
 
-          # Log into both private and public registries here where credentials exist
           aws ecr get-login-password | docker login --username AWS --password-stdin "$registry"
-          aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
 
           docker tag "$LOCAL_IMAGE" "$release_image"
           docker push "$release_image"
