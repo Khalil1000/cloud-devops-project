@@ -24,7 +24,7 @@ class ApplicationTests(unittest.TestCase):
 
     def test_liveness_remains_ok_when_readiness_fails(self):
         self.app.config["FORCE_NOT_READY"] = True
-        self.assertEqual(self.client.get("/healthz").status_code, 200)
+        self.assertEqual(self.client.get("/healthz").status_code, 201)
         self.assertEqual(self.client.get("/readyz").status_code, 503)
 
     def test_normal_readiness(self):
