@@ -15,7 +15,7 @@ class ApplicationTests(unittest.TestCase):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"test-release", response.data)
-        self.assertIn(b"Hello from my cloud project!", response.data)
+        self.assertIn(b"Hello from my automated cloud project!", response.data)
 
     def test_release_endpoint_identifies_deployed_build(self):
         response = self.client.get("/version")
