@@ -13,7 +13,7 @@ def create_app(test_config=None):
     app = Flask(__name__)
     app.config.from_mapping(
         APP_VERSION=os.getenv("APP_VERSION", "local"),
-        APP_MESSAGE="Hello from my cloud project!",
+        APP_MESSAGE="Hello from my automated cloud project!",
         ENABLE_DEMO_ERRORS=os.getenv("ENABLE_DEMO_ERRORS", "false").lower() == "true",
         FORCE_NOT_READY=os.getenv("FORCE_NOT_READY", "false").lower() == "true",
     )
