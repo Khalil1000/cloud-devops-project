@@ -194,6 +194,65 @@ The undo command and `successfully rolled out` landed in the same second (`00:32
 
 ---
 
+## Part 4: an AWS error surfaces correctly, and a Lambda rollback works
+
+Both run directly against the deployed `live` Lambda function — no local cluster involved. Neither affected end users: the error path is a single authenticated, synchronous invocation of an already-disabled-by-default demo endpoint, and the rollback was verified and then restored within the same session.
+
+### A deliberate error is visible in Lambda's own metrics and logs
+
+A single authenticated invocation was made against a demo endpoint that always returns an HTTP 500:
+
+```
+$ aws lambda invoke --function-name devops-portfolio --qualifier live \
+    --cli-binary-format raw-in-base64-out --payload file://events/error.json \
+    evidence/private/error-response.json
+{
+    "StatusCode": 200,
+    "FunctionError": "Unhandled",
+    "ExecutedVersion": "8"
+}
+{
+    "errorType": "&alloc::boxed::Box<dyn core::error::Error + core::marker::Send + core::marker::Sync>",
+    "errorMessage": "Request failed with configured error status code: 500"
+}
+```
+
+`StatusCode: 200` only means Lambda successfully invoked the function — `FunctionError: "Unhandled"` is the actual signal that this was recorded as an execution error, not a successful response. That distinction exists because the Lambda Web Adapter is configured with `AWS_LWA_ERROR_STATUS_CODES=500-599`, which converts an HTTP 500 from the app into a Lambda-level failure.
+
+**The error is visible in Lambda's own Errors metric:**
+
+![Lambda Monitor tab showing a new error in the Errors graph](images/26-error-demo-monitor-errors-metric.png)
+
+**And in the structured CloudWatch log for that exact request** — the app's own `"level": "ERROR"` record for `POST /demo/error` returning `500`, immediately followed by the Lambda runtime's panic message, with a healthy `/healthz` check from the same worker in the same window for contrast:
+
+![CloudWatch log showing the structured error record](images/27-error-demo-cloudwatch-logs.png)
+
+**The function was not left broken.** A normal smoke test right after confirms `live` is healthy and still serving the correct release:
+
+![Smoke test passing immediately after the error demo](images/28-error-demo-smoke-test-recovered.png)
+
+### Optional: rolling a live Lambda alias back to a prior version
+
+Separate from the Kubernetes rollback in Part 3, this demonstrates the AWS-specific recovery path: pointing the immutable `live` alias at an older published version directly, without redeploying anything.
+
+**Available versions:**
+
+![List of published Lambda versions](images/29-rollback-list-versions.png)
+
+**Rolled back to version 7** (the version behind the current release):
+
+![Alias repointed to version 7, with timestamp](images/30-rollback-alias-to-v7.png)
+
+**Verified over real HTTP that the rollback actually took effect** — not just that the alias metadata changed, but that `live` was genuinely serving the older commit:
+
+![Smoke test confirming the older commit is live](images/31-rollback-verified-old-version.png)
+
+**Restored to the current version** before finishing, so the account wasn't left on an old release:
+
+![Alias restored to version 8, confirmed healthy](images/32-rollback-restored-v8.png)
+
+---
+
 ## Why a pull request cannot change production
 
 Several independent layers each stop a broken change:
@@ -216,3 +275,4 @@ Several independent layers each stop a broken change:
 - **Image scanning is not implemented yet.** The "Scan the exact image that will be deployed" step is currently a placeholder that only prints a message, so it is not claimed as a control here.
 - **Administrators can bypass the branch rule.** GitHub shows a "merge without waiting for requirements" option to repository admins. Even then, a `main` release only happens through this workflow, and its tests still have to pass.
 - **Node.js 20 deprecation warning** on some GitHub Actions. It is cosmetic and will clear as the pinned actions are updated.
+- **No CloudWatch alarm or email alerting is configured.** The pipeline demonstrates that an error surfaces correctly in Lambda's `Errors` metric and in structured CloudWatch logs (see Part 4), which is the operational-visibility evidence this project relies on. A standing alarm and SNS subscription were left out on purpose, to avoid keeping a notification resource running for a demo project rather than because the pattern wasn't understood.
