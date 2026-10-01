@@ -1,4 +1,4 @@
-FROM python:3.13-slim-bookworm
+FROM python:3.14-slim-bookworm
 
 # Lambda starts this extension; Docker/kind simply runs Gunicorn.
 COPY --from=ghcr.io/khalil1000/aws-lambda-adapter:0.9.1 /lambda-adapter /opt/extensions/lambda-adapter
