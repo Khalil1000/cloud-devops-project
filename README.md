@@ -114,8 +114,6 @@ This is a learning and portfolio system with local Kubernetes and an AWS serverl
 
 **Why Lambda instead of EKS/ECS for the actual AWS release:** the project's real constraint is cost at rest. Lambda bills per invocation with no idle charge, so a portfolio project that gets looked at occasionally doesn't accrue a running bill between visits. The tradeoff is architectural, not just financial — Lambda's immutable versions and alias-based promotion is a different (and in some ways simpler) rollback model than a Kubernetes Deployment's revision history, which is part of why this project deliberately practices and documents both (see Evidence, above) rather than treating them as interchangeable.
 
-Before making claims about your results, run the guide and replace the placeholders in your evidence and incident notes with your actual observations.
-
 ## Resume / CV bullet
 
 Only use this after you've actually completed the guide and evidence steps above — don't add deployment time, recovery time or cost figures unless you've personally measured them; this project's own incident note is a good example of recording what was actually timed versus what wasn't.
