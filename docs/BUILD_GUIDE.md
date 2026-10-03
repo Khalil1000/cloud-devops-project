@@ -1,7 +1,7 @@
 # Build a low-cost AWS and DevOps portfolio project
 
 **Prepared 7 September 2026.** Follow the stages in order. Each stage explains
-the purpose, the commands, the expected result and the useful interview lesson.
+the purpose, commands, expected results, and verification steps.
 All commands use Bash and run from the extracted `cloud-devops-project` folder
 unless a step explicitly says otherwise.
 
@@ -25,7 +25,7 @@ You will build one small Python web application with two deployment targets:
 | Email error alarm | Optional AWS resource | Practice detection and incident response |
 
 **Kubernetes does not run on AWS in this design.** Lambda runs the AWS workload.
-You should describe this distinction accurately on your CV. Both targets use the
+Both targets use the
 same application and Dockerfile; the pipeline tests its image on Kubernetes
 before publishing that image to AWS.
 
@@ -309,7 +309,7 @@ Two pods on one node provide a useful rollout exercise, but they do not protect
 against losing the whole node. This is a local lab, not a highly available cluster.
 
 **Checkpoint:** the Deployment shows `2/2` ready and the page works through the
-Service. Save a screenshot for your portfolio. Stop port-forward with Ctrl+C
+Service. Save a screenshot as deployment evidence. Stop port-forward with Ctrl+C
 when you no longer need it; the cluster itself will continue running locally.
 
 ## 5. Create the GitHub repository and run CI
@@ -538,6 +538,14 @@ existing_github_oidc_provider_arn = ""
 The repository value is case-sensitive. It has no `https://` prefix and no
 `.git` suffix. Leave the optional alarm off initially.
 
+The trust subject in `infra/environment/delivery.tf` is pinned to this
+repository's immutable GitHub identity and `main` branch. The
+`github_repository` variable alone does not change that trust condition.
+When reproducing this project in another repository, replace the subject with
+that repository's exact OIDC `sub` value before applying Terraform. Preserve
+`StringEquals` and the `main` branch restriction; do not use wildcard owner,
+repository, or branch patterns.
+
 Check whether this account already has GitHub's OIDC provider:
 
 ```bash
@@ -739,8 +747,8 @@ the failed PR.
 
 ## 13. Practice Kubernetes recovery locally
 
-**Why:** a useful interview story includes what you observed, how you diagnosed
-it and how you proved recovery. These exercises have no AWS compute cost.
+**Why:** recovery verification records what failed, how it was diagnosed,
+and how service was restored. These exercises have no AWS compute cost.
 
 First make sure the local cluster still exists and the app is healthy:
 
@@ -804,8 +812,8 @@ python3 scripts/smoke_test.py http://127.0.0.1:8080 --expected-version local
 ```
 
 **Evidence:** save the failing readiness event, the old ready pods, the rollback
-command and the passing final check. Fill in `docs/INCIDENT_TEMPLATE.md` using
-your real timestamps; do not invent recovery-time measurements.
+command and the passing final check. The completed [incident report](INCIDENT_TEMPLATE.md)
+records this project's exercise. For a new run, create a separate record with its observed timestamps.
 
 ## 14. Generate an AWS error and optionally test email alerting
 
@@ -993,33 +1001,17 @@ Avoid broad Docker prune commands if you have other projects on your computer.
 Keep the source repository. Remove stale AWS repository variables or leave
 deployment disabled. Do not commit your private state backups.
 
-## 16. Turn the finished work into a portfolio entry
+## 16. Verification records
 
-Use real evidence from your run:
+The [evidence page](evidence/README.md) contains the completed deployment,
+security-gate, monitoring, and recovery demonstrations. The
+[validation record](VALIDATION.md) distinguishes CI checks from AWS releases
+and records the current operating scope.
 
-| Evidence | What it proves |
-| --- | --- |
-| A green pipeline with a commit SHA | Automated verification and delivery |
-| The AWS response showing that SHA | The expected release reached AWS |
-| A failed PR test and blocked release | The quality gate actually works |
-| Ready Kubernetes pods and a Service | You can deploy and inspect a workload |
-| A failed readiness rollout and recovery | You understand diagnosis and rollback |
-| A JSON error record; optional alarm email | Operational visibility |
-| A small cost record and completed teardown | Cost awareness and ownership |
-
-Add your architecture diagram, setup instructions, screenshots, incident note
-and design decisions to the README. Explain why you chose local kind plus
-on-demand Lambda and where that differs from production Kubernetes hosting.
-
-After you have actually completed it, an accurate CV bullet could be:
-
-> Built a container delivery pipeline with GitHub Actions, Terraform and AWS
-> Lambda; validated deployments on local Kubernetes, used OIDC for AWS access,
-> and demonstrated monitoring and rollback with controlled failure exercises.
-
-Only add numbers such as deployment time, recovery time or cost after you
-measure them. A three-minute screen recording of a change, successful AWS
-version check and recovery exercise is enough to make the project reviewable.
+For subsequent releases, record the workflow URL, commit SHA, and Lambda
+response identifying the deployed version. A green CI run establishes AWS
+delivery only when the AWS authentication, publishing, and release checks ran
+successfully; skipped AWS steps do not verify a deployment.
 
 ## Troubleshooting reference
 
