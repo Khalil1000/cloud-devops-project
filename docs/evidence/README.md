@@ -1,11 +1,13 @@
 # CI/CD delivery evidence
 
-Evidence that the pipeline in [`.github/workflows/pipeline.yml`](../../.github/workflows/pipeline.yml) does two things:
+Evidence for the delivery and verification behavior of [`.github/workflows/pipeline.yml`](../../.github/workflows/pipeline.yml):
 
-1. **A reviewed change merged to `main` is deployed to AWS Lambda automatically**, with no manual container pushes and no stored AWS access keys.
+1. **With AWS delivery enabled, a reviewed change merged to `main` is deployed to AWS Lambda automatically**, with no manual container pushes and no stored AWS access keys.
 2. **A failing test blocks delivery.** A broken change turns the check red, stops the later steps, and cannot reach AWS.
 
 The AWS account ID is blurred in the screenshots below.
+
+**Current status (3 October 2026):** `AWS_DEPLOY_ENABLED=false` pauses new AWS releases. The earlier AWS demonstrations below remain historical evidence. Run #66 verified the latest scan fix through Kubernetes in CI, but skipped AWS authentication and publishing; it does not establish that the fixed image is running in Lambda. Disabling delivery does not tear down existing AWS resources.
 
 ## How the pipeline works
 
@@ -253,6 +255,21 @@ Separate from the Kubernetes rollback in Part 3, this demonstrates the AWS-speci
 
 ---
 
+## Part 5: the vulnerability gate blocks delivery, then passes after remediation
+
+The first real CI execution of the scan in [run #64](https://github.com/Khalil1000/cloud-devops-project/actions/runs/37080837934) reported six fixable HIGH/CRITICAL findings and stopped the job before Kubernetes verification or AWS delivery. Repeating the scan returned the same findings.
+
+The local JSON report showed old `jaraco.context` and `wheel` copies bundled inside `setuptools`, while the remaining findings were attributed to an embedded software inventory (SBOM). The top-level packages were already at the fix versions reported by the scanner, so upgrading those packages alone did not clear the gate.
+
+The Dockerfile now installs and checks application dependencies, then uninstalls `pip`, `setuptools`, and `wheel` from the runtime image. The scanner policy was not weakened and no vulnerability exceptions were added. The rebuilt image reported `0 fixable HIGH/CRITICAL vulnerabilities`; this describes the configured gate, not an absence of all vulnerabilities.
+
+| Verification | Result |
+|---|---|
+| [PR run #65](https://github.com/Khalil1000/cloud-devops-project/actions/runs/37083694063) | Passed after removal of the runtime installation tools |
+| [Merged PR #13](https://github.com/Khalil1000/cloud-devops-project/pull/13) | Included the real scan gate and runtime-image fix |
+| [Main run #66](https://github.com/Khalil1000/cloud-devops-project/actions/runs/37083931737) | Tests, Terraform validation, build, scan and Kubernetes verification passed |
+| AWS delivery in run #66 | Skipped because `AWS_DEPLOY_ENABLED=false`; no new Lambda deployment was demonstrated by this run |
+
 ## Why a pull request cannot change production
 
 Several independent layers each stop a broken change:
@@ -274,5 +291,5 @@ Several independent layers each stop a broken change:
 ## Known gaps
 
 - **Administrators can bypass the branch rule.** GitHub shows a "merge without waiting for requirements" option to repository admins. Even then, a `main` release only happens through this workflow, and its tests still have to pass.
-- **Node.js 20 deprecation warning** on some GitHub Actions. It is cosmetic and will clear as the pinned actions are updated.
+- **Terraform action runtime maintenance resolved:** PR #1 upgraded setup-terraform to v4.0.1. Main run #80 passed without check annotations.
 - **No CloudWatch alarm or email alerting is configured.** The pipeline demonstrates that an error surfaces correctly in Lambda's `Errors` metric and in structured CloudWatch logs (see Part 4), which is the operational-visibility evidence this project relies on. A standing alarm and SNS subscription were left out on purpose, to avoid keeping a notification resource running for a demo project rather than because the pattern wasn't understood.
