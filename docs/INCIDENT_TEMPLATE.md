@@ -1,4 +1,4 @@
-# Incident note — replace every placeholder with your observations
+# Incident report — Kubernetes readiness failure and rollback
 
 **Exercise:** failed deployment, triggered intentionally to practice diagnosis and rollback
 
