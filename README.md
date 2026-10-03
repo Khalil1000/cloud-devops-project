@@ -2,7 +2,15 @@
 
 A small Python application, packaged once as a Docker image, tested on local Kubernetes, and deployed to AWS Lambda through GitHub Actions.
 
-Start with the step-by-step build guide. It explains what to run, why each step exists, what success looks like, and how to recover when something goes wrong.
+Start with the [step-by-step build guide](docs/BUILD_GUIDE.md). It explains what to run, why each step exists, what success looks like, and how to recover when something goes wrong.
+
+## Current project status
+
+As of 3 October 2026, the AWS deployment and recovery demonstrations are recorded in the [evidence](docs/evidence/README.md). Automatic AWS delivery is currently paused: the GitHub repository variable `AWS_DEPLOY_ENABLED` is set to `false`.
+
+CI still runs application tests, Terraform validation, the container build, the Trivy security gate, and deployment verification on an ephemeral `kind` cluster. [Run #66 on main](https://github.com/Khalil1000/cloud-devops-project/actions/runs/37083931737) passed these checks after the scan fix; its AWS credential and publishing steps were intentionally skipped. The updated image was therefore verified in CI but was not deployed to Lambda by that run.
+
+This switch stops new AWS releases; it does not delete existing resources or eliminate their storage and logging charges. For a deliberate AWS deployment, set the repository variable to `true` and run **Portfolio pipeline** on `main` after confirming the infrastructure and other repository variables are configured. See the [validation record](docs/VALIDATION.md) for completed checks and scope.
 
 ## What you will demonstrate
 
@@ -97,13 +105,14 @@ Open http://127.0.0.1:8080. Continue in the build guide for Docker, Kubernetes, 
 
 ## Evidence
 
-Every claim above is backed by a real, screenshotted run rather than a description of what should happen:
+The evidence page records completed demonstrations with screenshots and workflow links:
 
 - **[`docs/evidence/README.md`](docs/evidence/README.md)** — the full proof set, in order:
   - **Part 1:** a merged change deploying to AWS automatically, with the `live` alias moving and the correct commit SHA verified over HTTP
   - **Part 2:** a failing test blocking delivery — red check, blocked merge, later steps skipped, restored to green
   - **Part 3:** two Kubernetes recovery drills on a local `kind` cluster — automatic pod replacement, and a rejected rollout that keeps serving traffic on the old revision until rolled back
   - **Part 4:** a deliberate AWS error surfacing in Lambda's `Errors` metric and structured CloudWatch logs, plus an independent Lambda-alias rollback to a prior immutable version
+  - **Part 5:** the real vulnerability scan blocking delivery, removal of unnecessary Python installation tools from the runtime image, and the subsequent passing PR and main checks
 - **[`docs/INCIDENT_TEMPLATE.md`](docs/INCIDENT_TEMPLATE.md)** — a filled incident note for the rollout-rejection drill: real timestamps, root cause traced to a failing readiness probe, the rollback command, and what I'd improve next.
 
 ## Honest project description
