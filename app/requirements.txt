@@ -6,7 +6,7 @@ click==8.5.0
 itsdangerous==2.2.0
 Jinja2==3.1.6
 MarkupSafe==3.0.3
-Werkzeug==3.1.8
+Werkzeug==3.1.9
 jaraco.context==6.1.2
 msgpack==1.2.1
 setuptools==78.1.1
