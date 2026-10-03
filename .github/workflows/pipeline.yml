@@ -70,7 +70,16 @@ jobs:
           exit 1
 
       - name: Scan the exact image that will be deployed
-        run: echo "Temporarily skipping scanner check to unblock delivery"
+        run: |
+          for attempt in 1 2 3; do
+            if bash scripts/scan_image.sh "$LOCAL_IMAGE"; then
+              exit 0
+            fi
+            echo "Scan attempt $attempt failed — retrying in 15s..."
+            sleep 15
+          done
+          echo "Scan failed after 3 attempts" >&2
+          exit 1
 
       - name: Install local Kubernetes tools
         run: |

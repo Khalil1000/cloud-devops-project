@@ -16,7 +16,7 @@ Everything runs in one job, so a failure in any step stops the steps after it.
 | 1 | Unit tests (`python -m unittest discover -s tests -v`) | Yes |
 | 2 | Terraform `fmt` and `validate`, with no AWS credentials | Yes |
 | 3 | Build the release image once | Yes |
-| 4 | Image scan (placeholder, see [Known gaps](#known-gaps)) | Yes |
+| 4 | Image scan with Trivy, blocking on fixable HIGH/CRITICAL findings | Yes |
 | 5 | Deploy that same image to an ephemeral `kind` Kubernetes cluster and verify it | Yes |
 | 6 | Request short-lived AWS credentials through GitHub OIDC | **No** |
 | 7 | Push the verified image to ECR and run `scripts/deploy_lambda.sh` to promote it to the `live` alias | **No** |
@@ -269,10 +269,10 @@ Several independent layers each stop a broken change:
 - **Empty registry host.** A malformed `ECR_REPOSITORY_URL` variable made the ECR login fail with a confusing Docker error. The variable was corrected and the script now fails with a clear message if the registry host is empty.
 - **Public ECR rate limiting (HTTP 429).** The build pulls the AWS Lambda Web Adapter image from a registry that throttles anonymous pulls from shared CI runners. The pinned `amd64` image is now mirrored to a public GHCR package and the Dockerfile references the mirror, which removes the external dependency.
 - **Missing IAM permission.** The deploy role isn't allowed to request public ECR tokens, and the pipeline never needed them, so that login was dropped instead of widening the role.
+- **The vulnerability scan gate was documented but not wired up.** `scripts/scan_image.sh` already ran a real Trivy scan and correctly blocked on fixable HIGH/CRITICAL findings when run by hand, but the CI step that was supposed to call it was still a placeholder that only printed a message. CI now calls the real script, wrapped in the same retry pattern used for the image build, since the scanner pulls its own container image and vulnerability database over the network and can hit the same kind of transient registry flakiness documented above.
 
 ## Known gaps
 
-- **Image scanning is not implemented yet.** The "Scan the exact image that will be deployed" step is currently a placeholder that only prints a message, so it is not claimed as a control here.
 - **Administrators can bypass the branch rule.** GitHub shows a "merge without waiting for requirements" option to repository admins. Even then, a `main` release only happens through this workflow, and its tests still have to pass.
 - **Node.js 20 deprecation warning** on some GitHub Actions. It is cosmetic and will clear as the pinned actions are updated.
 - **No CloudWatch alarm or email alerting is configured.** The pipeline demonstrates that an error surfaces correctly in Lambda's `Errors` metric and in structured CloudWatch logs (see Part 4), which is the operational-visibility evidence this project relies on. A standing alarm and SNS subscription were left out on purpose, to avoid keeping a notification resource running for a demo project rather than because the pattern wasn't understood.
