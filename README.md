@@ -73,9 +73,11 @@ The [incident report](docs/INCIDENT_TEMPLATE.md) records the Kubernetes rollout 
 
 ## Current operating status
 
-As of **3 October 2026**, [main run #83](https://github.com/Khalil1000/cloud-devops-project/actions/runs/37155600060) passed after the OIDC trust-policy and evidence updates were merged. Automatic AWS delivery is paused with `AWS_DEPLOY_ENABLED=false`; CI continues to verify the application, infrastructure configuration, image, and Kubernetes deployment.
+As of **4 October 2026**, [run #88](https://github.com/Khalil1000/cloud-devops-project/actions/runs/37166774042) completed the full pipeline on `main`, including GitHub OIDC authentication, ECR image publication, and Lambda release promotion. The deployed source commit was `cae347a70fa94f2000ab0165aae80d917aad0b6a`.
 
-Earlier AWS releases and recovery exercises are documented above. The recent CI runs do not establish that the latest image is deployed to Lambda. The exact `main` trust restriction has been verified in AWS; an AWS-enabled pipeline run remains outstanding to verify deployment with that restriction. Release instructions and verification scope are recorded in the [validation record](docs/VALIDATION.md).
+This release verified the corrected runtime image and deployment through the role restricted to this repository's exact `main` identity. Tests, Terraform validation, Trivy scanning, and Kubernetes verification also passed. The successful release step includes candidate health and version checks before promotion and verification of the `live` alias afterward. See [evidence Part 6](docs/evidence/README.md#part-6-aws-release-verified-after-the-trust-policy-restriction) and the [validation record](docs/VALIDATION.md).
+
+AWS delivery is controlled by `AWS_DEPLOY_ENABLED`: `true` allows eligible main-branch releases, while `false` keeps CI verification active and skips AWS publication. Disabling delivery does not tear down existing resources.
 
 ## Design decisions
 
