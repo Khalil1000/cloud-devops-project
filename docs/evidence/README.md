@@ -132,9 +132,9 @@ Closing it, not merging, keeps `main` and production untouched.
 
 ---
 
-## Part 3: Kubernetes recovery, practiced locally
+## Part 3: Kubernetes recovery on a local cluster
 
-Run entirely on the local `kind` cluster, with no AWS cost and no effect on `live`. Two things were practiced: how a Deployment replaces a deleted pod on its own, and how a rolling update protects running traffic from a bad config change until it's rolled back. The full incident write-up, including root cause and what I'd improve, is in [`docs/INCIDENT_TEMPLATE.md`](../INCIDENT_TEMPLATE.md).
+Run entirely on the local `kind` cluster, with no AWS cost and no effect on `live`. The exercises verified automatic pod replacement and recovery from a failed readiness rollout while the previous revision continued serving traffic. The incident report records the root cause, recovery, and follow-up considerations in [`docs/INCIDENT_REPORT.md`](../INCIDENT_REPORT.md).
 
 ### Preflight
 
@@ -198,7 +198,7 @@ The undo command and `successfully rolled out` landed in the same second (`00:32
 
 ## Part 4: an AWS error surfaces correctly, and a Lambda rollback works
 
-Both run directly against the deployed `live` Lambda function — no local cluster involved. Neither affected end users: the error path is a single authenticated, synchronous invocation of an already-disabled-by-default demo endpoint, and the rollback was verified and then restored within the same session.
+Both run directly against the deployed `live` Lambda function — no local cluster involved. Neither affected end users: the error path is a single authenticated, synchronous invocation of a demo endpoint explicitly enabled in the AWS configuration, and the rollback was verified and then restored within the same session.
 
 ### A deliberate error is visible in Lambda's own metrics and logs
 
@@ -310,4 +310,4 @@ Several independent layers each stop a broken change:
 
 - **Administrators can bypass the branch rule.** GitHub shows a "merge without waiting for requirements" option to repository admins. Even then, a `main` release only happens through this workflow, and its tests still have to pass.
 - **Terraform action runtime maintenance resolved:** PR #1 upgraded setup-terraform to v4.0.1. Main run #80 passed without check annotations.
-- **No CloudWatch alarm or email alerting is configured.** The pipeline demonstrates that an error surfaces correctly in Lambda's `Errors` metric and in structured CloudWatch logs (see Part 4), which is the operational-visibility evidence this project relies on. A standing alarm and SNS subscription were left out on purpose, to avoid keeping a notification resource running for a demo project rather than because the pattern wasn't understood.
+- **No CloudWatch alarm or email alerting is configured.** The pipeline demonstrates that an error surfaces correctly in Lambda's `Errors` metric and in structured CloudWatch logs (see Part 4), which is the operational-visibility evidence this project relies on. The optional CloudWatch alarm and SNS subscription remain outside the demonstrated scope.

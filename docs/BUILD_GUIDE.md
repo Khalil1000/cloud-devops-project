@@ -1,33 +1,31 @@
-# Build a low-cost AWS and DevOps portfolio project
+# Build and operations guide
 
-**Prepared 7 September 2026.** Follow the stages in order. Each stage explains
-the purpose, commands, expected results, and verification steps.
-All commands use Bash and run from the extracted `cloud-devops-project` folder
-unless a step explicitly says otherwise.
+This guide covers application setup, infrastructure provisioning, automated
+deployment, and recovery exercises. Each stage includes commands and verification
+steps.
 
-You can pause after any checkpoint. When asking for help, mention the stage
-number, your operating system, the command and its error. Do not include access
-keys, session tokens, Terraform state contents or passwords.
+Commands use Bash and run from the repository root unless stated otherwise.
+Keep credentials, session tokens, passwords, and Terraform state files out of
+version control.
 
-## 0. Understand the project and its cost boundaries
+## 0. Architecture and cost boundaries
 
-You will build one small Python web application with two deployment targets:
+The Python application has two deployment targets:
 
 | Component | Where it runs | Why it is here |
 | --- | --- | --- |
-| Python app and Docker | Your computer | Learn the application and container before adding infrastructure |
-| Kubernetes through kind | Your computer; also a temporary GitHub runner | Practice Deployments, Services, probes, rolling updates and recovery |
+| Python app and Docker | Local machine | Run and verify the application before deploying infrastructure |
+| Kubernetes through kind | Local machine and temporary GitHub runner | Verify Deployments, Services, probes, rolling updates and recovery |
 | AWS Lambda | AWS, on demand | Run a real AWS application without an always-on server |
 | Amazon ECR | AWS | Store the actual private container images used by Lambda |
-| Terraform state | Versioned, encrypted S3 bucket | Track your AWS infrastructure and lock concurrent state changes |
+| Terraform state | Versioned, encrypted S3 bucket | Track AWS infrastructure and lock concurrent state changes |
 | GitHub Actions and OIDC | GitHub and AWS IAM | Test and release automatically using temporary AWS credentials |
 | CloudWatch | AWS | Review JSON application logs and built-in Lambda metrics |
-| Email error alarm | Optional AWS resource | Practice detection and incident response |
+| Email error alarm | Optional AWS resource | Optional error notification |
 
 **Kubernetes does not run on AWS in this design.** Lambda runs the AWS workload.
-Both targets use the
-same application and Dockerfile; the pipeline tests its image on Kubernetes
-before publishing that image to AWS.
+Both targets use the same application and Dockerfile; the pipeline tests the
+image on Kubernetes before publishing it to AWS.
 
 The Dockerfile includes AWS Lambda Web Adapter, an AWS-maintained extension that
 lets a normal HTTP application run in Lambda. Docker and kind start Gunicorn
@@ -47,13 +45,12 @@ storage, requests, logs and data transfer depend on what you run. Check your
 account's current allowances and credits in Billing. [ECR pricing](https://aws.amazon.com/ecr/pricing/)
 
 AWS lists a Lambda allowance of 1 million requests and 400,000 GB-seconds per
-month. Other usage in your account shares applicable allowances. We set this
-function to 256 MB, a 10-second timeout and on-demand execution. We do not
-configure provisioned concurrency. [Lambda pricing](https://aws.amazon.com/lambda/pricing/)
+month. Other account usage shares applicable allowances. The function uses 256 MB,
+a 10-second timeout and on-demand execution, without provisioned concurrency. [Lambda pricing](https://aws.amazon.com/lambda/pricing/)
 
 S3 object storage and requests, ECR storage, log ingestion and any optional alarm
 can still be billable. Lambda's built-in metrics are available without the cost
-of publishing custom metrics. We use the existing Lambda console charts instead
+of publishing custom metrics. The project uses the existing Lambda console charts instead
 of creating a separately billed dashboard or custom metrics. [S3 pricing](https://aws.amazon.com/s3/pricing/),
 [CloudWatch pricing](https://aws.amazon.com/cloudwatch/pricing/)
 
@@ -89,13 +86,13 @@ flowchart TD
   TF --> State["S3 state and IAM"]
 ```
 
-The cluster in this diagram lives on a temporary GitHub runner. Your laptop has
-its own kind cluster for learning; GitHub does not remotely deploy into your
-laptop. Merging a successful change automatically updates the AWS deployment.
+The CI cluster runs on a temporary GitHub runner, independently of the local
+kind cluster. Merging a successful change updates the AWS deployment when
+`AWS_DEPLOY_ENABLED=true`.
 
-## 1. Prepare your computer
+## 1. Prerequisites
 
-**Why:** using one consistent terminal avoids mixing Windows paths, Linux
+**Purpose:** using one consistent terminal avoids mixing Windows paths, Linux
 containers and different tool installations.
 
 - **Windows:** install WSL2 with Ubuntu and Docker Desktop. Enable Docker
@@ -158,20 +155,19 @@ kubectl version --client
 
 Reference versions are Terraform 1.14.6, kind 0.31.0 and kubectl 1.35.0. The
 Docker runtime uses Python 3.13. These are deliberate version selections, not a
-claim that they will remain the latest versions. Before a future upgrade, review
+guarantee that they are the latest releases. Before a future upgrade, review
 the release notes and rerun the checks. [kind documentation](https://kind.sigs.k8s.io/docs/user/quick-start/)
 
-**Checkpoint:** every version command returns successfully and `docker info`
+**Verification:** every version command returns successfully and `docker info`
 can contact the Docker engine. Allow roughly 4 GB of memory for Docker if your
 computer has sufficient RAM; one local cluster is enough.
 
 If an installer download fails or a checksum differs, stop that installer and
 check the publisher's release page. Do not remove the checksum check to continue.
 
-## 2. Run and understand the app locally
+## 2. Run the application locally
 
-**Why:** if the app does not work on your laptop, adding containers and AWS
-will make the failure harder to diagnose.
+Verify application behaviour locally before testing the container and AWS runtime.
 
 Create a Python virtual environment, which keeps this project's packages away
 from your system Python:
@@ -204,7 +200,7 @@ python3 scripts/smoke_test.py http://127.0.0.1:8080 --expected-version local
 | `/version` | Identify the deployed release | JSON containing `"version":"local"` |
 | `POST /demo/error` | Controlled error exercise | HTTP 404 until the demo is enabled |
 
-Read `app/app.py` after trying the endpoints. Each completed HTTP request writes
+In `app/app.py`, each completed HTTP request writes
 a JSON log with its path, status, duration, release version and severity. A 5xx
 response gets `level: ERROR`. The duration is application handler time, not full
 internet round-trip time.
@@ -213,12 +209,12 @@ The unit tests verify observable behavior: health versus readiness, release
 identity, the disabled demo endpoint, structured error logging and the release
 gate. The smoke test is different: it calls a running process over HTTP.
 
-**Checkpoint:** the test suite ends in `OK` and the smoke test prints `PASS`.
+**Verification:** the test suite ends in `OK` and the smoke test prints `PASS`.
 Use Ctrl+C in the first terminal to stop the local server before the next stage.
 
 ## 3. Put the app in Docker
 
-**Why:** Docker packages the app and its dependencies into an image that other
+**Purpose:** Docker packages the app and its dependencies into an image that other
 machines can run consistently.
 
 Build a local image using your computer's native CPU architecture:
@@ -259,14 +255,13 @@ not mean the image contains no vulnerabilities. If the gate fails, update the
 affected package or base image, rebuild and scan again. Do not simply disable
 the gate to make the pipeline green. [Trivy image scanning](https://trivy.dev/docs/latest/guide/target/container_image/)
 
-**Checkpoint:** the container's smoke test passes and you understand the scan
-result. Ctrl+C stops this container; `--rm` removes the stopped container but
+**Verification:** the container smoke test passes and the scan reports no blocking
+findings. Ctrl+C stops this container; `--rm` removes the stopped container but
 keeps its image.
 
 ## 4. Deploy locally with Kubernetes
 
-**Why:** this is where you learn how a deployment maintains a desired number
-of application instances, checks readiness and updates them safely.
+**Purpose:** verify replica management, readiness checks, and rolling updates.
 
 Make sure your project-local tools are on PATH, then create a one-node cluster:
 
@@ -294,7 +289,7 @@ Keep port-forward running and open <http://127.0.0.1:8080>. If port 8080 is
 already in use, stop the previous Python/Docker server or use `8081:80` and
 open port 8081 instead.
 
-Read `k8s/app.yaml.tpl` and connect the settings to what you see:
+The application manifest in `k8s/app.yaml.tpl` defines:
 
 - **Deployment:** asks Kubernetes to maintain two app pods.
 - **Service:** provides one stable internal address for ready pods.
@@ -308,14 +303,13 @@ Read `k8s/app.yaml.tpl` and connect the settings to what you see:
 Two pods on one node provide a useful rollout exercise, but they do not protect
 against losing the whole node. This is a local lab, not a highly available cluster.
 
-**Checkpoint:** the Deployment shows `2/2` ready and the page works through the
+**Verification:** the Deployment shows `2/2` ready and the page works through the
 Service. Save a screenshot as deployment evidence. Stop port-forward with Ctrl+C
 when you no longer need it; the cluster itself will continue running locally.
 
 ## 5. Create the GitHub repository and run CI
 
-**Why:** employers should be able to inspect the code, see the automated
-checks, and understand how changes are delivered.
+**Purpose:** run automated verification for repository changes and control release eligibility.
 
 On GitHub, create an **empty repository** named `cloud-devops-project`. A public
 repository is appropriate for a portfolio and standard public Actions runners
@@ -366,15 +360,15 @@ for your repository. Choose the actual check shown in GitHub's picker. For a
 solo project, requiring someone else's approval can prevent you merging your
 own work, so a required passing check is sufficient for this lab.
 
-**Checkpoint:** Actions is green through the kind deployment, while the AWS
-steps are skipped. This is a useful working project even before the AWS stages.
+**Verification:** Actions is green through the kind deployment, while the AWS
+steps are skipped. AWS release verification is covered in the later stages.
 
 ## 6. Sign in to AWS using temporary credentials
 
-**Why:** Terraform needs permission to create resources, while the later CI
+**Purpose:** Terraform needs permission to create resources, while the later CI
 role will receive a much narrower set of deployment permissions.
 
-Use a personal learning account and a **non-root administrator identity** for
+Use a personal sandbox account and a **non-root administrator identity** for
 the one-time Terraform provisioning. Creating IAM roles and their policies
 requires broader permissions than merely invoking a function. The pipeline
 will not get your administrator permissions.
@@ -382,9 +376,9 @@ will not get your administrator permissions.
 If you are starting from a new account, secure the root login with MFA, then use
 IAM to create a separate lab administrator with console access. In a managed
 account, use an existing authorized role instead. Do not make access keys for
-this tutorial; the sign-in method below produces temporary credentials.
+this setup; the sign-in method below produces temporary credentials.
 
-For a brand-new personal learning account, the console route is **IAM → Users
+For a brand-new personal sandbox account, the console route is **IAM → Users
 → Create user**. Name it `portfolio-admin`, enable AWS Management Console
 access, and create/use a group with the AWS-managed `AdministratorAccess`
 policy. Finish creation, sign out of root, sign in through the IAM user's
@@ -424,13 +418,13 @@ You do not need the extra `portfolio-login` profile in the SSO case.
 [AWS CLI sign-in](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sign-in.html),
 [IAM Identity Center authentication](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sso.html)
 
-**Checkpoint:** `aws sts get-caller-identity` shows the intended account and a
+**Verification:** `aws sts get-caller-identity` shows the intended account and a
 non-root user/role. If a session expires, log in again before retrying the failed
 command. Use the same region throughout this guide.
 
 ## 7. Create the state bucket, registry and budget alert
 
-**Why:** Terraform needs somewhere to store state, and Lambda needs an image
+**Purpose:** Terraform needs somewhere to store state, and Lambda needs an image
 that already exists in ECR. This small bootstrap stack solves both dependencies
 before you create the application stack.
 
@@ -481,12 +475,12 @@ confirm the amount and email address. If Billing access is denied, the account
 owner may need to enable IAM access to Billing; do not replace your CLI profile
 with root credentials to get around the issue.
 
-**Checkpoint:** `terraform output` shows the state bucket and ECR repository URL.
+**Verification:** `terraform output` shows the state bucket and ECR repository URL.
 AWS has not yet created an application function or running server.
 
 ## 8. Publish the first image to ECR
 
-**Why:** Lambda's initial creation requires a valid image. Later releases will
+**Purpose:** Lambda's initial creation requires a valid image. Later releases will
 be handled by GitHub Actions, but you must publish one bootstrap image first.
 
 ```bash
@@ -509,13 +503,13 @@ stage and the image already exists, reuse it. If you intentionally need a
 different initial build, give it a new tag and update `bootstrap_image_tag` in
 the next stage. The CI workflow uses unique tags for every run and retry.
 
-**Checkpoint:** open **ECR → Private repositories → devops-portfolio** and see
+**Verification:** open **ECR → Private repositories → devops-portfolio** and see
 the `bootstrap` image. Do not enable enhanced ECR/Inspector scanning for this
 lab; the project uses Trivy in CI and leaves ECR scan-on-push off.
 
 ## 9. Create the AWS application and deployment role
 
-**Why:** Terraform now connects the stored image to Lambda, gives it permission
+**Purpose:** Terraform now connects the stored image to Lambda, gives it permission
 to write its own logs and gives your repository a limited release role.
 
 ```bash
@@ -598,13 +592,12 @@ git commit -m "Record Terraform provider selections"
 git push
 ```
 
-**Checkpoint:** Terraform completes and shows `function_name`, `github_role_arn`
+**Verification:** Terraform completes and shows `function_name`, `github_role_arn`
 and the console URL. No publicly accessible AWS application URL exists.
 
-## 10. Invoke your real AWS application
+## 10. Verify the AWS application
 
-**Why:** AWS deployment is only useful when you can prove the function executes
-the expected application version and produces logs.
+**Purpose:** verify that Lambda runs the expected application version and produces logs.
 
 ```bash
 export LAMBDA_FUNCTION_NAME=$(terraform -chdir=infra/environment output -raw function_name)
@@ -616,7 +609,7 @@ version. The script checks both the AWS invocation result and the application's
 HTTP result, then checks the release identifier. An AWS invocation API result
 of 200 by itself does not prove the function succeeded.
 
-To inspect one invocation yourself:
+To inspect an individual invocation:
 
 ```bash
 mkdir -p evidence/private
@@ -641,15 +634,15 @@ aws logs tail "/aws/lambda/$LAMBDA_FUNCTION_NAME" --since 10m
 ```
 
 The one-day log retention keeps storage small; save any screenshots or incident
-evidence you want to keep before logs expire. Do not enable Lambda Insights,
-Application Signals or tracing just to complete this stage.
+evidence you want to keep before logs expire. Lambda Insights,
+Application Signals and tracing are outside this configuration.
 
-**Checkpoint:** the smoke script confirms `bootstrap`, and CloudWatch contains
-a corresponding request record. Your project now includes genuine AWS execution.
+**Verification:** the smoke script confirms `bootstrap`, and CloudWatch contains
+a corresponding request record. This verifies the bootstrap release on AWS.
 
 ## 11. Turn on automatic AWS deployment
 
-**Why:** the final delivery path should work from a reviewed code change, without
+**Purpose:** the final delivery path should work from a reviewed code change, without
 manual container pushes or copied AWS credentials.
 
 In GitHub open **Settings → Secrets and variables → Actions → Variables**.
@@ -705,13 +698,12 @@ commit, push the branch and open a pull request. Merge after checks pass. The
 AWS version will update automatically. Updating the test here reflects an
 intentional change in the required greeting; do not change tests to hide bugs.
 
-**Checkpoint:** you can point to a successful GitHub run, its commit SHA, the
-same SHA returned by Lambda and the application's logs.
+**Verification:** the workflow succeeds, Lambda returns the expected commit SHA,
+and CloudWatch contains the application request logs.
 
-## 12. Prove a failed test blocks delivery
+## 12. Verify the failing-test gate
 
-**Why:** a visible failure exercise demonstrates that the pipeline protects
-delivery instead of merely running commands that always pass.
+**Purpose:** confirm that a failed test prevents subsequent delivery stages.
 
 Start from a clean working tree:
 
@@ -745,9 +737,9 @@ change `main`.
 later successful run. Check that AWS's `live` alias remained unchanged during
 the failed PR.
 
-## 13. Practice Kubernetes recovery locally
+## 13. Verify Kubernetes recovery locally
 
-**Why:** recovery verification records what failed, how it was diagnosed,
+**Purpose:** recovery verification records what failed, how it was diagnosed,
 and how service was restored. These exercises have no AWS compute cost.
 
 First make sure the local cluster still exists and the app is healthy:
@@ -812,13 +804,13 @@ python3 scripts/smoke_test.py http://127.0.0.1:8080 --expected-version local
 ```
 
 **Evidence:** save the failing readiness event, the old ready pods, the rollback
-command and the passing final check. The completed [incident report](INCIDENT_TEMPLATE.md)
+command and the passing final check. The completed [incident report](INCIDENT_REPORT.md)
 records this project's exercise. For a new run, create a separate record with its observed timestamps.
 
 ## 14. Generate an AWS error and optionally test email alerting
 
-**Why:** deployments need operational feedback. You can demonstrate error
-logging with the default resources; the email alarm is an optional extra.
+**Purpose:** verify error logging with the default resources. Email notification
+is an optional extension.
 
 The AWS function has the demo endpoint enabled, and it is accessible only
 through authenticated invocation. Make one deliberate synchronous request:
@@ -949,7 +941,7 @@ aws lambda delete-function-concurrency --function-name "$LAMBDA_FUNCTION_NAME"
 
 1. Set GitHub's `AWS_DEPLOY_ENABLED` variable to `false` and let current runs
    finish. Save screenshots and notes you want to keep.
-2. Ensure your AWS session is current and points at the correct learning account.
+2. Ensure your AWS session is current and points at the correct sandbox account.
 3. Destroy the application stack:
 
 ```bash
@@ -1037,7 +1029,7 @@ successfully; skipped AWS steps do not verify a deployment.
 | No alarm email | Subscription confirmed, new error and correct region? | Confirm SNS and check the actual alarm state/history |
 | Budget email has not arrived | Billing data and configured threshold | Check Billing directly; the alert is delayed and is not a cap |
 
-## Reopening the project on another day
+## Resume an existing environment
 
 From the same project folder:
 

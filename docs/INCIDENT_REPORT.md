@@ -1,6 +1,6 @@
 # Incident report — Kubernetes readiness failure and rollback
 
-**Exercise:** failed deployment, triggered intentionally to practice diagnosis and rollback
+**Exercise:** controlled readiness failure with diagnosis and rollback
 
 **Date and environment:** 2026-10-01, local `kind` cluster (`kind-portfolio`, namespace `portfolio`)
 
@@ -30,24 +30,25 @@ Readiness probe failed: HTTP probe failed with statuscode: 503
 | 2026-10-01T00:32:56Z | Ran `kubectl rollout undo deployment/portfolio --to-revision=1`; `rollout status` returned `successfully rolled out` in the same second |
 | (immediately after) | Verified recovery: `get pods` showed 2/2 `Running` with no trace of the failed pod; `python3 scripts/smoke_test.py` returned `PASS: healthy application, release local` |
 
-I didn't capture an exact timestamp for when I finished reading the diagnosis output, so I'm not claiming a precise mean-time-to-diagnose figure — only the two timestamps I actually recorded (fault introduced, deadline exceeded) and the fact that the rollback itself was issued about 24 minutes later, after I'd worked through the `describe`/`events`/`logs` output.
+The diagnosis completion time was not recorded, so no precise diagnosis-duration metric is available. The rollback was issued about 24 minutes after the rollout deadline failure, following inspection of the deployment and pod events.
 
 ## Cause and recovery
 
 **Cause:** setting `FORCE_NOT_READY=true` made the application's `/readyz` endpoint return `503` for any pod built from that revision. The Deployment's rolling update strategy is `maxUnavailable: 0, maxSurge: 1`, so Kubernetes created exactly one new candidate pod rather than replacing the existing ones, and refused to promote it because it never passed its readiness probe. This is also why the running application was never actually interrupted — the two pods on the previous revision were never touched.
 
-**Recovery:** `kubectl rollout undo deployment/portfolio --to-revision=1` pointed the Deployment back at the ReplicaSet (`portfolio-564596b456`) that was already running and already healthy, so there was no new pod to schedule or wait on. That's why the undo command and `successfully rolled out` landed in the same second.
+**Recovery:** `kubectl rollout undo deployment/portfolio --to-revision=1` pointed the Deployment back at the ReplicaSet (`portfolio-564596b456`) that was already running and already healthy, so there was no new pod to schedule or wait on. The command and successful rollout response share the same recorded second.
 
-**Verification:** three independent checks, not just one:
+**Verification:**
+
 1. `kubectl rollout status` → `successfully rolled out`
 2. `kubectl get pods` → 2/2 `Running`, failed candidate pod gone entirely
-3. `python3 scripts/smoke_test.py http://127.0.0.1:8080 --expected-version local` → `PASS: healthy application, release local`, confirming the live application responded correctly, not just that the Deployment object looked healthy
+3. `python3 scripts/smoke_test.py http://127.0.0.1:8080 --expected-version local` → `PASS: healthy application, release local`, confirming the application responded with the expected release
 
 **Image/revision:** image `portfolio:local`; rolled back from revision `2` (the bad config) to revision `1` (the recorded `$GOOD_REVISION`).
 
-## What I would improve
+## Follow-up considerations
 
-Right now, recovering from a failed rollout depends on a person noticing the stuck deployment and running `rollout undo` manually. A tool like Argo Rollouts or Flagger could watch the same readiness signal and roll back automatically the moment the progress deadline is exceeded, removing the human-reaction-time step entirely. The tradeoff is real: it adds another controller to install, configure and keep up to date, and an automatic rollback could mask a change that was only slow to become ready rather than genuinely broken, so it would need a deliberately conservative deadline to avoid rolling back good deploys.
+This exercise used a manual rollback. The existing `scripts/deploy_local.sh` provides rollout and HTTP checks with rollback to a previous revision on failure; the exercise commands were run directly to capture each diagnostic step. A future change could add an automated test of that recovery path, including delayed readiness, to verify that rollback triggers only after the configured failure conditions.
 
 ## Evidence
 
