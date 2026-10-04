@@ -8,7 +8,7 @@ A Python application delivered through GitHub Actions, with infrastructure manag
 
 The project demonstrates the full delivery lifecycle: automated checks, scoped AWS authentication, release verification, monitoring, and recovery from deliberate failures.
 
-**[Deployment evidence](docs/evidence/README.md) · [Build guide](docs/BUILD_GUIDE.md) · [Validation record](docs/VALIDATION.md) · [Incident report](docs/INCIDENT_TEMPLATE.md)**
+**[Deployment evidence](docs/evidence/README.md) · [Build guide](docs/BUILD_GUIDE.md) · [Validation record](docs/VALIDATION.md) · [Incident report](docs/INCIDENT_REPORT.md)**
 
 ## Project highlights
 
@@ -65,11 +65,11 @@ Terraform provisions IAM, ECR, Lambda, CloudWatch, and the encrypted, versioned 
 |---|---|
 | [Automated AWS delivery](docs/evidence/README.md#part-1-a-merged-change-deploys-to-aws-automatically) | A merged change reached Lambda, with the live alias and release identifier verified. |
 | [Failing-test gate](docs/evidence/README.md#part-2-a-failing-test-blocks-delivery) | A deliberate test failure stopped later pipeline stages; restoring the test returned CI to green. |
-| [Kubernetes recovery](docs/evidence/README.md#part-3-kubernetes-recovery-practiced-locally) | A deleted pod was replaced, and a failed readiness rollout was rolled back and checked over HTTP. |
+| [Kubernetes recovery](docs/evidence/README.md#part-3-kubernetes-recovery-on-a-local-cluster) | A deleted pod was replaced, and a failed readiness rollout was rolled back and checked over HTTP. |
 | [AWS monitoring and rollback](docs/evidence/README.md#part-4-an-aws-error-surfaces-correctly-and-a-lambda-rollback-works) | An intentional error appeared in CloudWatch; a previous Lambda version was restored, verified, and then returned to the current release. |
 | [Vulnerability remediation](docs/evidence/README.md#part-5-the-vulnerability-gate-blocks-delivery-then-passes-after-remediation) | The scan blocked six findings; removing runtime installation tools produced a passing scan under the same policy. |
 
-The [incident report](docs/INCIDENT_TEMPLATE.md) records the Kubernetes rollout diagnosis, recovery steps, and observed timestamps.
+The [incident report](docs/INCIDENT_REPORT.md) records the Kubernetes rollout diagnosis, recovery steps, and observed timestamps.
 
 ## Current operating status
 

@@ -32,7 +32,7 @@ The [evidence record](evidence/README.md) contains screenshots and observations 
 - Kubernetes pod replacement and a failed readiness rollout recovered with rollback and an HTTP smoke test (Part 3).
 - A deliberate Lambda execution error appearing in metrics and structured CloudWatch logs, plus alias rollback and restoration (Part 4).
 
-The [incident note](INCIDENT_TEMPLATE.md) records the Kubernetes diagnosis, timestamps, recovery and limitations of the timing evidence.
+The [incident report](INCIDENT_REPORT.md) records the Kubernetes diagnosis, timestamps, recovery and limitations of the timing evidence.
 
 ## Current operating scope
 
