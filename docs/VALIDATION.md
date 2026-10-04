@@ -1,6 +1,12 @@
 # Validation record
 
-Updated 3 October 2026. This record distinguishes current CI verification from earlier AWS demonstrations. The original authoring checks were recorded on 7 September 2026; the later runs below supersede the original outstanding Docker, Terraform-provider, Kubernetes and AWS demonstration checks.
+Updated 4 October 2026. This record separates full AWS release verification from historical CI-only runs and recovery exercises.
+
+## Latest AWS release verification - run #88
+
+[Run #88](https://github.com/Khalil1000/cloud-devops-project/actions/runs/37166774042) passed on `main` for commit `cae347a70fa94f2000ab0165aae80d917aad0b6a`. Application tests, Terraform validation, the Docker build, Trivy scan, and Kubernetes rollout checks all passed. Both AWS authentication and publication/promotion steps ran successfully.
+
+This verifies delivery after the exact repository-and-main OIDC trust restriction was applied. The release script verifies the candidate before moving `live` and checks the alias afterward. See [evidence Part 6](evidence/README.md#part-6-aws-release-verified-after-the-trust-policy-restriction).
 
 ## Scan-fix verification — run #66
 
@@ -30,10 +36,10 @@ The [incident note](INCIDENT_TEMPLATE.md) records the Kubernetes diagnosis, time
 
 ## Current operating scope
 
-The repository variable `AWS_DEPLOY_ENABLED` is currently `false`. Main and PR checks still verify the application, infrastructure configuration, image and local Kubernetes deployment. Earlier AWS evidence demonstrates that the delivery path worked at the recorded time; run #66 did not deploy the newly fixed image or revalidate the current AWS account.
+`AWS_DEPLOY_ENABLED` was enabled for run #88. Main and PR checks verify the application, infrastructure configuration, image and Kubernetes deployment; AWS release steps additionally require delivery to be enabled on main. Run #66 was CI-only, while run #88 verified the corrected image through AWS release promotion.
 
 To make a deliberate new release, confirm the existing infrastructure and repository variables, set `AWS_DEPLOY_ENABLED=true` under **Settings > Secrets and variables > Actions > Variables**, and run **Portfolio pipeline** on `main`. Confirm both AWS steps and the candidate/live smoke checks pass, then record that run as new release evidence. Setting the switch back to `false` prevents later workflow releases but does not delete resources or stop all AWS charges; use the build guide's cleanup procedure for teardown.
 
 CloudWatch alarm and email notification setup remain optional and were not configured. Runtime logs and metrics were demonstrated; email delivery was not. The Terraform action's Node.js 20 warning was resolved by merged PR #1. Main run #80 passed without check annotations; its AWS authentication and deployment steps were skipped.
 
-On 3 October 2026, the live AWS deployment role's trust policy was verified to use StringEquals for the exact ID-based GitHub subject of this repository's main branch. Both wildcard subject patterns were removed. An AWS-enabled pipeline run remains outstanding to verify deployment with the restricted policy.
+On 3 October 2026, the live AWS deployment role's trust policy was verified to use StringEquals for the exact ID-based GitHub subject of this repository's main branch. Both wildcard subject patterns were removed. Run #88 on 4 October 2026 subsequently passed AWS authentication and deployment with that restriction.

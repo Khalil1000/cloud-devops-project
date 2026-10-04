@@ -7,7 +7,7 @@ Evidence for the delivery and verification behavior of [`.github/workflows/pipel
 
 The AWS account ID is blurred in the screenshots below.
 
-**Current status (3 October 2026):** `AWS_DEPLOY_ENABLED=false` pauses new AWS releases. The earlier AWS demonstrations below remain historical evidence. Run #66 verified the latest scan fix through Kubernetes in CI, but skipped AWS authentication and publishing; it does not establish that the fixed image is running in Lambda. Disabling delivery does not tear down existing AWS resources.
+**Latest verified AWS release (4 October 2026):** [Run #88](https://github.com/Khalil1000/cloud-devops-project/actions/runs/37166774042) passed all verification and AWS delivery steps for commit `cae347a70fa94f2000ab0165aae80d917aad0b6a` after the exact `main` OIDC trust restriction was applied. Earlier runs that skipped AWS remain historical CI evidence; run #88 verifies the updated image through Lambda release promotion.
 
 ## How the pipeline works
 
@@ -269,6 +269,24 @@ The Dockerfile now installs and checks application dependencies, then uninstalls
 | [Merged PR #13](https://github.com/Khalil1000/cloud-devops-project/pull/13) | Included the real scan gate and runtime-image fix |
 | [Main run #66](https://github.com/Khalil1000/cloud-devops-project/actions/runs/37083931737) | Tests, Terraform validation, build, scan and Kubernetes verification passed |
 | AWS delivery in run #66 | Skipped because `AWS_DEPLOY_ENABLED=false`; no new Lambda deployment was demonstrated by this run |
+
+## Part 6: AWS release verified after the trust-policy restriction
+
+[Run #88](https://github.com/Khalil1000/cloud-devops-project/actions/runs/37166774042) was manually dispatched on `main` on 4 October 2026 for source commit `cae347a70fa94f2000ab0165aae80d917aad0b6a`. The job completed successfully with both AWS steps executed, rather than skipped.
+
+| Stage | Recorded result |
+|---|---|
+| Application and release tests | Passed |
+| Terraform validation | Passed |
+| Docker image build | Passed |
+| Trivy security gate | Passed under the existing fixable HIGH/CRITICAL policy |
+| Kubernetes rollout and HTTP verification | Passed |
+| Obtain short-lived AWS credentials | Passed using GitHub OIDC |
+| Publish the verified image and promote AWS release | Passed |
+
+The role's live trust condition had already been verified to match only `repo:Khalil1000@138799611/cloud-devops-project@1379707365:ref:refs/heads/main` using `StringEquals`. This run confirms that the permitted main-branch workflow can still authenticate and release after removing the wildcard subjects.
+
+The release script pushes the checked image to ECR, publishes an immutable Lambda version, checks the candidate's health, readiness, and expected commit, then promotes and verifies the `live` alias. Its successful completion closes the previously outstanding AWS deployment verification. This run does not demonstrate a new rollback or a denied OIDC request; those are separate from successful release verification.
 
 ## Why a pull request cannot change production
 
